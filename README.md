@@ -1,6 +1,6 @@
 # rn-voice-assistant
 
-Expo voice assistant: on-device speech-to-text, streamed Claude replies, text-to-speech.
+Expo voice assistant: platform speech-to-text (on-device on iOS when supported), streamed Claude replies, text-to-speech.
 
 [![CI](https://github.com/Muhaman/rn-voice-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Muhaman/rn-voice-assistant/actions/workflows/ci.yml)
 
@@ -8,7 +8,7 @@ Expo voice assistant: on-device speech-to-text, streamed Claude replies, text-to
 
 Tap the microphone, ask a question out loud, and hear a short spoken answer.
 
-- Speech is transcribed by the platform recognizer through `expo-speech-recognition` (on-device when the device supports it).
+- Speech is transcribed by the platform recognizer through `expo-speech-recognition`. On iOS it is forced on-device when the device supports it; on Android it uses the platform recognizer, which falls back to network recognition if no on-device model is installed.
 - The transcript and conversation history go to a small Express proxy, which streams Claude's reply back over Server-Sent Events.
 - The app renders the reply as it arrives and reads it aloud with `expo-speech` when it is complete.
 - The Anthropic API key lives only on the proxy; the app never sees it.
@@ -65,7 +65,7 @@ docker run --rm -p 3000:3000 -e ANTHROPIC_API_KEY=... rn-voice-assistant-server
 
 ## Usage / API
 
-`POST /v1/chat` requires an `x-device-id` header (uuid) and a body of 1 to 50 messages, each 1 to 4000 characters.
+`POST /v1/chat` requires an `x-device-id` header (uuid) and a body of 1 to 50 messages (the first from the user), each 1 to 4000 characters.
 
 ```bash
 curl -N http://localhost:3000/v1/chat \
@@ -104,14 +104,14 @@ cd server && npm install && npm test   # vitest
 cd app && npm install && npm test      # jest-expo + React Native Testing Library
 ```
 
-Server: valid stream, validation (51 messages, empty or oversized content, missing or malformed device id), disconnect aborting the upstream signal, refusal, `max_tokens`, empty reply, typed LLM failures, per-device 429 JSON, health check, env validation, and the Claude wrapper against a stub client (including the fallback gating).
-App: `MicButton` labels, press and disabled state; `MessageList` ordering; `useChat` chunk accumulation, history and failure handling; `useVoice` against a mocked `expo-speech-recognition`.
+Server: valid stream, validation (51 messages, a conversation not starting with a user message, empty or oversized content, missing or malformed device id), disconnect aborting the upstream signal, refusal, `max_tokens`, empty reply, typed LLM failures, per-device 429 JSON, health check, env validation, and the Claude wrapper against a stub client (including the fallback gating).
+App: `MicButton` labels, press and disabled state; `MessageList` ordering; `useChat` chunk accumulation, alternating user-first history (including trimming past 50 messages) and failure handling; the SSE parser (split chunks, CRLF, multi-line data, comments, error events, early close, malformed JSON, reader release); `useVoice` against a mocked `expo-speech-recognition`.
 
-CI runs both suites plus lint, type-checks and a Docker build of the proxy. It does not build native binaries, so on-device behaviour (recognizer, audio session, streaming over the real `expo/fetch`) is untested here.
+CI runs both suites plus lint, type-checks and a Docker build of the proxy. It does not build native binaries, so behaviour on a real device (recognizer, audio session, streaming over the real `expo/fetch`) is untested here.
 
 ## Limitations & next steps
 
-- Not exercised on a device or simulator by CI; the SSE client in `app/src/api/chat.ts` has no automated test.
+- Not exercised on a device or simulator by CI; the SSE parser is unit-tested, but the real `expo/fetch` streaming path is not.
 - Turn-based only: no barge-in, no continuous conversation, and replies are spoken once complete rather than sentence by sentence.
 - Conversation history lives in memory; the proxy is stateless and resends the last 50 messages each turn.
 - English only (`en-US`) for both recognition and speech.
