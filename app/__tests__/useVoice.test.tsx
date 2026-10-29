@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
+import { Platform } from "react-native";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 
 import { useVoice } from "../src/hooks/useVoice";
@@ -14,6 +15,7 @@ const speech = jest.mocked(ExpoSpeechRecognitionModule);
 beforeEach(() => {
   jest.clearAllMocks();
   speech.requestPermissionsAsync.mockResolvedValue({ granted: true } as never);
+  speech.supportsOnDeviceRecognition.mockReturnValue(false);
 });
 
 const emit = (name: string, payload?: Record<string, unknown>) =>
@@ -62,6 +64,31 @@ describe("useVoice", () => {
     await emit("error", { error: "audio-capture" });
     await emit("end");
     expect(result.current.state).toBe("error");
+  });
+
+  it.each([
+    ["ios", true, true],
+    ["ios", false, false],
+    ["android", true, false],
+  ] as const)("on %s with on-device support %s requires on-device recognition: %s", async (os, supported, expected) => {
+    const restore = jest.replaceProperty(Platform, "OS", os);
+    speech.supportsOnDeviceRecognition.mockReturnValue(supported);
+    const { result } = await renderHook(() => useVoice());
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(speech.start).toHaveBeenCalledWith(expect.objectContaining({ requiresOnDeviceRecognition: expected }));
+    restore.restore();
+  });
+
+  it("aborts recognition on unmount", async () => {
+    const { unmount } = await renderHook(() => useVoice());
+
+    await unmount();
+
+    expect(speech.abort).toHaveBeenCalledTimes(1);
   });
 
   it("stops recognition", async () => {

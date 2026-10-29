@@ -1,5 +1,6 @@
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 export type VoiceState = "idle" | "listening" | "error";
 
@@ -9,6 +10,9 @@ const BENIGN_ERRORS = new Set<string>(["no-speech", "aborted"]);
 export function useVoice() {
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
+
+  // Release the microphone if the screen goes away mid-session.
+  useEffect(() => () => ExpoSpeechRecognitionModule.abort(), []);
 
   useSpeechRecognitionEvent("start", () => setState("listening"));
   useSpeechRecognitionEvent("end", () => setState((current) => (current === "error" ? current : "idle")));
@@ -29,7 +33,8 @@ export function useVoice() {
       lang: "en-US",
       interimResults: true,
       continuous: false,
-      requiresOnDeviceRecognition: ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
+      // Android falls back to network recognition when no on-device model is installed.
+      requiresOnDeviceRecognition: Platform.OS === "ios" && ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
     });
   }, []);
 
