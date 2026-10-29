@@ -1,15 +1,10 @@
 import { fetch } from "expo/fetch";
 
+import { decodeChunks, parseSseStream } from "./sse";
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-}
-
-function readField(json: string, key: string): string | null {
-  const value: unknown = JSON.parse(json);
-  if (typeof value !== "object" || value === null) return null;
-  const field = (value as Record<string, unknown>)[key];
-  return typeof field === "string" ? field : null;
 }
 
 async function failureMessage(response: Awaited<ReturnType<typeof fetch>>): Promise<string> {
@@ -21,12 +16,6 @@ async function failureMessage(response: Awaited<ReturnType<typeof fetch>>): Prom
     // Not a JSON error body; fall through to the generic message.
   }
   return `The assistant is unavailable (HTTP ${response.status}).`;
-}
-
-/** Splits an SSE buffer into complete blocks plus the unfinished remainder. */
-function splitBlocks(buffer: string): { blocks: string[]; rest: string } {
-  const parts = buffer.split("\n\n");
-  return { blocks: parts.slice(0, -1), rest: parts.at(-1) ?? "" };
 }
 
 /**
@@ -49,26 +38,8 @@ export async function streamChat(
   if (!response.ok) throw new Error(await failureMessage(response));
   if (!response.body) throw new Error("The assistant returned an empty response.");
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let finished = false;
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const { blocks, rest } = splitBlocks(buffer);
-    buffer = rest;
-
-    for (const block of blocks) {
-      const event = /^event: (.*)$/m.exec(block)?.[1];
-      const data = /^data: (.*)$/m.exec(block)?.[1] ?? "{}";
-      if (event === "text") onText(readField(data, "text") ?? "");
-      else if (event === "done") finished = true;
-      else if (event === "error") throw new Error(readField(data, "message") ?? "The assistant failed.");
-    }
+  for await (const event of parseSseStream(decodeChunks(response.body.getReader()))) {
+    if (event.type === "text") onText(event.text);
+    else if (event.type === "error") throw new Error(event.message);
   }
-
-  if (!finished) throw new Error("The connection closed before the reply finished.");
 }
