@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.expo
+ios
+android
+package-lock.json
+*.log
+.DS_Store

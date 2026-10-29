@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Voice Assistant",
+    "slug": "rn-voice-assistant",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "dev.muhaman.voiceassistant",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "dev.muhaman.voiceassistant"
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone to hear your question.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to convert your speech to text.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:3000"
+    }
+  }
+}
