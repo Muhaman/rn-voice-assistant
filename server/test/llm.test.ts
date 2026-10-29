@@ -49,7 +49,7 @@ describe("ClaudeLlm.stream", () => {
     const [body, options] = stream.mock.calls[0] ?? [];
     expect(body?.output_config).toEqual({ effort: "low" });
     expect(body?.messages).toEqual(input.messages);
-    expect(body?.system).toEqual(expect.stringContaining("spoken"));
+    expect(body?.system).toEqual(expect.stringContaining("read aloud"));
     expect(options?.signal).toBe(input.signal);
     for (const forbidden of ["temperature", "top_p", "top_k", "tool_choice"]) {
       expect(body).not.toHaveProperty(forbidden);
