@@ -9,11 +9,11 @@ const { emitSpeechEvent } = jest.requireMock<{
   emitSpeechEvent: (name: string, payload?: Record<string, unknown>) => void;
 }>("expo-speech-recognition");
 
-const module = jest.mocked(ExpoSpeechRecognitionModule);
+const speech = jest.mocked(ExpoSpeechRecognitionModule);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  module.requestPermissionsAsync.mockResolvedValue({ granted: true } as never);
+  speech.requestPermissionsAsync.mockResolvedValue({ granted: true } as never);
 });
 
 const emit = (name: string, payload?: Record<string, unknown>) =>
@@ -31,7 +31,7 @@ describe("useVoice", () => {
     await emit("start");
     await emit("result", { results: [{ transcript: "what time is it" }], isFinal: true });
 
-    expect(module.start).toHaveBeenCalledWith(expect.objectContaining({ lang: "en-US", interimResults: true }));
+    expect(speech.start).toHaveBeenCalledWith(expect.objectContaining({ lang: "en-US", interimResults: true }));
     expect(result.current.state).toBe("listening");
     expect(result.current.transcript).toBe("what time is it");
 
@@ -42,14 +42,14 @@ describe("useVoice", () => {
   });
 
   it("reports an error and does not start when permission is denied", async () => {
-    module.requestPermissionsAsync.mockResolvedValue({ granted: false } as never);
+    speech.requestPermissionsAsync.mockResolvedValue({ granted: false } as never);
     const { result } = await renderHook(() => useVoice());
 
     await act(async () => {
       await result.current.start();
     });
 
-    expect(module.start).not.toHaveBeenCalled();
+    expect(speech.start).not.toHaveBeenCalled();
     expect(result.current.state).toBe("error");
   });
 
@@ -69,6 +69,6 @@ describe("useVoice", () => {
 
     result.current.stop();
 
-    expect(module.stop).toHaveBeenCalledTimes(1);
+    expect(speech.stop).toHaveBeenCalledTimes(1);
   });
 });
