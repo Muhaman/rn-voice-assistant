@@ -52,6 +52,22 @@ describe("POST /v1/chat", () => {
     expect((await postChat(url, { messages: [{ role: "user", content: "a".repeat(4001) }] })).status).toBe(400);
   });
 
+  it("rejects a conversation that does not start with a user message with 400", async () => {
+    const llm = new FakeLlm(reply("x"));
+    const url = await boot(llm);
+
+    const res = await postChat(url, {
+      messages: [
+        { role: "assistant", content: "Hello" },
+        { role: "user", content: "Hi" },
+      ],
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: { code: "invalid_request", message: expect.stringContaining("first message") } });
+    expect(llm.calls).toHaveLength(0);
+  });
+
   it("rejects a missing x-device-id with 400", async () => {
     const url = await boot(new FakeLlm(reply("x")));
 
