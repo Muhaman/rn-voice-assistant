@@ -69,6 +69,38 @@ describe("useChat", () => {
     expect(reply).toBeNull();
   });
 
+  it("keeps the history alternating after a failed reply", async () => {
+    mockedStream.mockRejectedValueOnce(new Error("down"));
+    mockedStream.mockImplementation(async (_url, _device, _messages, onText) => onText("ok"));
+    const { result } = await renderHook(() => useChat(options));
+
+    await act(async () => {
+      await result.current.send("lost question");
+    });
+    await act(async () => {
+      await result.current.send("retry");
+    });
+
+    expect(mockedStream.mock.calls[1]?.[2]).toEqual([{ role: "user", content: "retry" }]);
+  });
+
+  it("starts the wire history with a user message once it is trimmed to 50", async () => {
+    mockedStream.mockImplementation(async (_url, _device, _messages, onText) => onText("ok"));
+    const { result } = await renderHook(() => useChat(options));
+
+    for (let turn = 0; turn < 27; turn++) {
+      await act(async () => {
+        await result.current.send(`question ${turn}`);
+      });
+    }
+
+    const wire = mockedStream.mock.calls[26]?.[2] ?? [];
+    expect(wire.length).toBeLessThanOrEqual(50);
+    expect(wire[0]?.role).toBe("user");
+    expect(wire.at(-1)).toEqual({ role: "user", content: "question 26" });
+    expect(wire.every((message, index) => message.role === (index % 2 === 0 ? "user" : "assistant"))).toBe(true);
+  });
+
   it("ignores blank input", async () => {
     const { result } = await renderHook(() => useChat(options));
 

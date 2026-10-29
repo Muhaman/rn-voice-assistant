@@ -13,8 +13,20 @@ interface Options {
 
 const MAX_HISTORY = 50;
 
-const toWire = (messages: Message[]): ChatMessage[] =>
-  messages.slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content }));
+/**
+ * Builds a history the API accepts: roles alternate (a user turn whose reply failed is superseded by
+ * the next user turn) and the first message is from the user, even after trimming to the last 50.
+ */
+export function toWire(messages: Message[]): ChatMessage[] {
+  const alternating: ChatMessage[] = [];
+  for (const { role, content } of messages) {
+    if (alternating.at(-1)?.role === role) alternating.pop();
+    alternating.push({ role, content });
+  }
+  const recent = alternating.slice(-MAX_HISTORY);
+  const firstUser = recent.findIndex((message) => message.role === "user");
+  return firstUser === -1 ? [] : recent.slice(firstUser);
+}
 
 export function useChat({ apiUrl, deviceId }: Options) {
   const [messages, setMessages] = useState<Message[]>([]);
